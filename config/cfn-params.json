@@ -1,8 +1,8 @@
 {
-    "SourceS3BucketParameter" : "<NO-DEFAULT>",
+    "SourceS3BucketParameter" : "vcai-bucket",
     "ImageProcessorSourceS3KeyParameter" : "src/lambda_imageprocessor.zip",
     "FrameFetcherSourceS3KeyParameter" : "src/lambda_framefetcher.zip",
-    "FrameS3BucketNameParameter" : "<NO-DEFAULT>",
+    "FrameS3BucketNameParameter" : "vcai-frame-bucket",
     "FrameFetcherApiResourcePathPart" : "enrichedframe",
     "ApiGatewayRestApiNameParameter" : "VidAnalyzerRestApi",
     "ApiGatewayStageNameParameter": "development",
