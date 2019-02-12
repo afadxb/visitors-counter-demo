@@ -50,15 +50,15 @@ def check_bucket_exists(bucketname):
 def clean():
     '''Clean build directory.'''
     print 'Cleaning build directory...'
-    
+
     if os.path.exists('build'):
     	shutil.rmtree('build')
-    
+
     os.mkdir('build')
 
 @task()
 def packagelambda(* functions):
-    '''Package lambda functions into a deployment-ready zip files.''' 
+    '''Package lambda functions into a deployment-ready zip files.'''
     if not os.path.exists('build'):
         os.mkdir('build')
 
@@ -70,14 +70,14 @@ def packagelambda(* functions):
     for function in functions:
         print 'Packaging "%s" lambda function in directory' % function
         zipf = zipfile.ZipFile("%s.zip" % function, "w", zipfile.ZIP_DEFLATED)
-        
+
         write_dir_to_zip("../lambda/%s/" % function, zipf)
         zipf.write("../config/%s-params.json" % function, "%s-params.json" % function)
 
         zipf.close()
 
     os.chdir("..")
-    
+
     return
 
 
@@ -100,7 +100,7 @@ def updatelambda(*functions):
 @task()
 def deploylambda(* functions, **kwargs):
     '''Upload lambda functions .zip file to S3 for download by CloudFormation stack during creation.'''
-    
+
     cfn_params_path = kwargs.get("cfn_params_path", "config/cfn-params.json")
 
     if(len(functions) == 0):
@@ -115,7 +115,7 @@ def deploylambda(* functions, **kwargs):
     s3_keys["imageprocessor"] = cfn_params_dict["ImageProcessorSourceS3KeyParameter"]
 
     s3_client = boto3.client("s3")
-    
+
     print("Checking if S3 Bucket '%s' exists..." % (src_s3_bucket_name))
 
     if( not check_bucket_exists(src_s3_bucket_name)):
@@ -136,20 +136,20 @@ def deploylambda(* functions, **kwargs):
             )
 
     for function in functions:
-        
+
         print "Uploading function '%s' to '%s'" % (function, s3_keys[function])
-        
+
         with open('build/%s.zip' % (function), 'rb') as data:
             s3_client.upload_fileobj(data, src_s3_bucket_name, s3_keys[function])
-    
+
     return
 
 @task()
 def createstack(**kwargs):
     '''Create the Amazon Rekognition Video Analyzer stack using CloudFormation.'''
 
-    cfn_path = kwargs.get("cfn_path", "aws-infra/aws-infra-cfn.yaml") 
-    global_params_path = kwargs.get("global_params_path", "config/global-params.json") 
+    cfn_path = kwargs.get("cfn_path", "aws-infra/aws-infra-cfn.yaml")
+    global_params_path = kwargs.get("global_params_path", "config/global-params.json")
     cfn_params_path = kwargs.get("cfn_params_path", "config/cfn-params.json")
 
     global_params_dict = read_json(global_params_path)
@@ -188,8 +188,8 @@ def createstack(**kwargs):
 @task()
 def updatestack(**kwargs):
     '''Update the Amazon Rekognition Video Analyzer CloudFormation stack.'''
-    cfn_path = kwargs.get("cfn_path", "aws-infra/aws-infra-cfn.yaml") 
-    global_params_path = kwargs.get("global_params_path", "config/global-params.json") 
+    cfn_path = kwargs.get("cfn_path", "aws-infra/aws-infra-cfn.yaml")
+    global_params_path = kwargs.get("global_params_path", "config/global-params.json")
     cfn_params_path = kwargs.get("cfn_params_path", "config/cfn-params.json")
 
     global_params_dict = read_json(global_params_path)
@@ -243,7 +243,7 @@ def stackstatus(global_params_path="config/global-params.json"):
 
         if(response["Stacks"][0]):
             print("Stack '%s' has the status '%s'" % (stack_name, response["Stacks"][0]["StackStatus"]))
-    
+
     except ClientError as e:
         print "EXCEPTION: " + e.response["Error"]["Message"]
 
@@ -252,8 +252,8 @@ def stackstatus(global_params_path="config/global-params.json"):
 def deletestack(** kwargs):
     '''Delete Amazon Rekognition Video Analyzer infrastructure using CloudFormation.'''
 
-    cfn_path = kwargs.get("cfn_path", "aws-infra/aws-infra-cfn.yaml") 
-    global_params_path = kwargs.get("global_params_path", "config/global-params.json") 
+    cfn_path = kwargs.get("cfn_path", "aws-infra/aws-infra-cfn.yaml")
+    global_params_path = kwargs.get("global_params_path", "config/global-params.json")
     cfn_params_path = kwargs.get("cfn_params_path", "config/cfn-params.json")
 
     global_params_dict = read_json(global_params_path)
@@ -261,14 +261,14 @@ def deletestack(** kwargs):
 
     stack_name = global_params_dict["StackName"]
     usage_plan_name = cfn_params_dict["ApiGatewayUsagePlanNameParameter"]
-    
+
     cfn_client = boto3.client('cloudformation')
     apigw_client = boto3.client('apigateway')
 
     # Empty all objects in the frame bucket prior to deleting the stack.
     frame_s3_bucket_name = cfn_params_dict["FrameS3BucketNameParameter"]
     print("Attempting to DELETE ALL OBJECTS in '%s' bucket." % frame_s3_bucket_name)
-    
+
     s3 = boto3.resource('s3')
     s3.Bucket(frame_s3_bucket_name).objects.delete()
 
@@ -346,7 +346,7 @@ def webui(webdir="web-ui/", global_params_path="config/global-params.json", cfn_
     region_name = boto3.session.Session().region_name
 
     print "Putting together the API Gateway base URL."
-    
+
     api_base_url = "https://%s.execute-api.%s.amazonaws.com/%s" % (rest_api_id, region_name, api_stage_name)
 
     print "Writing API key and API base URL to apigw.js in '%ssrc/'" % web_build_dir
@@ -364,22 +364,22 @@ def webuiserver(webdir="web-ui/",port=8080):
     web_build_dir = 'build/%s' % webdir
 
     os.chdir(web_build_dir)
-    
+
     Handler = SimpleHTTPServer.SimpleHTTPRequestHandler
 
     httpd = SocketServer.TCPServer(("0.0.0.0", port), Handler)
 
     print "Starting local Web UI Server in directory '%s' on port %s" % (web_build_dir, port)
-    
+
     httpd.serve_forever()
-    
+
     return
 
 @task()
 def videocaptureip(videouri, capturerate="30", clientdir="client"):
     '''Run the IP camera video capture client using parameters video URI and frame capture rate.'''
     os.chdir(clientdir)
-    
+
     call(["python", "video_cap_ipcam.py", videouri, capturerate])
 
     os.chdir("..")
@@ -390,7 +390,7 @@ def videocaptureip(videouri, capturerate="30", clientdir="client"):
 def videocapture(capturerate="30",clientdir="client"):
     '''Run the video capture client with built-in camera. Default capture rate is 1 every 30 frames.'''
     os.chdir(clientdir)
-    
+
     call(["python", "video_cap.py", capturerate])
 
     os.chdir("..")
@@ -400,7 +400,7 @@ def videocapture(capturerate="30",clientdir="client"):
 @task()
 def deletedata(global_params_path="config/global-params.json", cfn_params_path="config/cfn-params.json", image_processor_params_path="config/imageprocessor-params.json"):
     '''DELETE ALL collected frames and metadata in Amazon S3 and Amazon DynamoDB. Use with caution!'''
-    
+
     cfn_params_dict = read_json(cfn_params_path)
     img_processor_params_dict = read_json(image_processor_params_path)
 
@@ -416,7 +416,7 @@ def deletedata(global_params_path="config/global-params.json", cfn_params_path="
 
 
     print("Attempting to DELETE ALL OBJECTS in '%s' S3 bucket." % frame_s3_bucket_name)
-    
+
     s3 = boto3.resource('s3')
     s3.Bucket(frame_s3_bucket_name).objects.delete()
 
@@ -463,3 +463,78 @@ def deletedata(global_params_path="config/global-params.json", cfn_params_path="
 
     return
 
+@task()
+def createcollection(collectionId='face-collection'):
+
+    maxResults=2
+    client=boto3.client('rekognition')
+
+    #Create a collection
+    print('Creating collection:' + collectionId)
+    response=client.create_collection(CollectionId=collectionId)
+    print('Collection ARN: ' + response['CollectionArn'])
+    print('Status code: ' + str(response['StatusCode']))
+    print('Done...')
+
+
+@task()
+def listcollections():
+    maxResults=2
+
+    client=boto3.client('rekognition')
+
+    #Display all the collections
+    print('Displaying collections...')
+    response=client.list_collections(MaxResults=maxResults)
+
+    while True:
+        collections=response['CollectionIds']
+
+        for collection in collections:
+            print (collection)
+        if 'NextToken' in response:
+            nextToken=response['NextToken']
+            response=client.list_collections(NextToken=nextToken,MaxResults=maxResults)
+
+        else:
+            break
+
+    print('done...')
+
+@task()
+def describecollection(collectionId='face-collection'):
+    print('Attempting to describe collection ' + collectionId)
+    client=boto3.client('rekognition')
+
+    try:
+        response=client.describe_collection(CollectionId=collectionId)
+        print("Collection Arn: "  + response['CollectionARN'])
+        print("Face Count: "  + str(response['FaceCount']))
+        print("Face Model Version: "  + response['FaceModelVersion'])
+        print("Timestamp: "  + str(response['CreationTimestamp']))
+
+
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            print ('The collection ' + collectionId + ' was not found ')
+        else:
+            print ('Error other than Not Found occurred: ' + e.response['Error']['Message'])
+    print('Done...')
+
+@task()
+def deletecollection(collectionId='face-collection'):
+    print('Attempting to delete collection ' + collectionId)
+    client=boto3.client('rekognition')
+    statusCode=''
+    try:
+        response=client.delete_collection(CollectionId=collectionId)
+        statusCode=response['StatusCode']
+
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            print ('The collection ' + collectionId + ' was not found ')
+        else:
+            print ('Error other than Not Found occurred: ' + e.response['Error']['Message'])
+        statusCode=e.response['ResponseMetadata']['HTTPStatusCode']
+    print('Operation returned Status Code: ' + str(statusCode))
+    print('Done...')
