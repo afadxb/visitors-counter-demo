@@ -28,7 +28,7 @@ def convert_ts(ts, config):
     #lambda_tz = timezone('US/Pacific')
     tz = timezone(config['timezone'])
     utc = pytz.utc
-    
+
     utc_dt = utc.localize(datetime.datetime.utcfromtimestamp(ts))
 
     localized_dt = utc_dt.astimezone(tz)
@@ -37,6 +37,8 @@ def convert_ts(ts, config):
 
 
 def process_image(event, context):
+
+    collection_id = 'face-collection'
 
     #Initialize clients
     rekog_client = boto3.client('rekognition')
@@ -51,7 +53,7 @@ def process_image(event, context):
     s3_key_frames_root = config["s3_key_frames_root"]
 
     ddb_table = dynamodb.Table(config["ddb_table"])
-      
+
     rekog_max_labels = config["rekog_max_labels"]
     rekog_min_conf = float(config["rekog_min_conf"])
 
@@ -69,32 +71,47 @@ def process_image(event, context):
         img_bytes = frame_package["ImageBytes"]
         approx_capture_ts = frame_package["ApproximateCaptureTime"]
         frame_count = frame_package["FrameCount"]
-        
+
         now_ts = time.time()
 
         frame_id = str(uuid.uuid4())
         processed_timestamp = decimal.Decimal(now_ts)
         approx_capture_timestamp = decimal.Decimal(approx_capture_ts)
-        
+
         now = convert_ts(now_ts, config)
         year = now.strftime("%Y")
         mon = now.strftime("%m")
         day = now.strftime("%d")
         hour = now.strftime("%H")
 
-        rekog_response = rekog_client.detect_labels(
+        response = rekog_client.index_faces(
+            CollectionId=collection_id,
             Image={
                 'Bytes': img_bytes
+                }
             },
-            MaxLabels=rekog_max_labels,
-            MinConfidence=rekog_min_conf
+            #ExternalImageId='string',
+            DetectionAttributes=[
+                'DEFAULT',
+            ],
+            MaxFaces=123,
+            QualityFilter='AUTO'
         )
+        print response
+
+#        rekog_response = rekog_client.detect_labels(
+#            Image={
+#                'Bytes': img_bytes
+#            },
+#            MaxLabels=rekog_max_labels,
+#            MinConfidence=rekog_min_conf
+#        )
 
 
         #Iterate on rekognition labels. Enrich and prep them for storage in DynamoDB
         labels_on_watch_list = []
         for label in rekog_response['Labels']:
-            
+
             lbl = label['Name']
             conf = label['Confidence']
             label['OnWatchList'] = False
@@ -145,13 +162,13 @@ def process_image(event, context):
 
         #Store frame image in S3
         s3_key = (s3_key_frames_root + '{}/{}/{}/{}/{}.jpg').format(year, mon, day, hour, frame_id)
-        
+
         s3_client.put_object(
             Bucket=s3_bucket,
             Key=s3_key,
             Body=img_bytes
         )
-        
+
         #Persist frame data in dynamodb
 
         item = {
@@ -159,8 +176,8 @@ def process_image(event, context):
             'processed_timestamp' : processed_timestamp,
             'approx_capture_timestamp' : approx_capture_timestamp,
             'rekog_labels' : rekog_response['Labels'],
-            'rekog_orientation_correction' : 
-                rekog_response['OrientationCorrection'] 
+            'rekog_orientation_correction' :
+                rekog_response['OrientationCorrection']
                 if 'OrientationCorrection' in rekog_response else 'ROTATE_0',
             'processed_year_month' : year + mon, #To be used as a Hash Key for DynamoDB GSI
             's3_bucket' : s3_bucket,

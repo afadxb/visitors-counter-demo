@@ -464,14 +464,18 @@ def deletedata(global_params_path="config/global-params.json", cfn_params_path="
     return
 
 @task()
-def createcollection(collectionId='face-collection'):
+def createcollection(**kwargs):
 
     maxResults=2
     client=boto3.client('rekognition')
 
+    global_params_path = kwargs.get("global_params_path", "config/global-params.json")
+    global_params_dict = read_json(global_params_path)
+    collection_id = global_params_dict["CollectionId"]
+
     #Create a collection
-    print('Creating collection:' + collectionId)
-    response=client.create_collection(CollectionId=collectionId)
+    print('Creating collection:' + collection_id)
+    response=client.create_collection(CollectionId=collection_id)
     print('Collection ARN: ' + response['CollectionArn'])
     print('Status code: ' + str(response['StatusCode']))
     print('Done...')
@@ -502,12 +506,16 @@ def listcollections():
     print('done...')
 
 @task()
-def describecollection(collectionId='face-collection'):
-    print('Attempting to describe collection ' + collectionId)
+def describecollection(**kwargs):
+    global_params_path = kwargs.get("global_params_path", "config/global-params.json")
+    global_params_dict = read_json(global_params_path)
+    collection_id = global_params_dict["CollectionId"]
+
+    print('Attempting to describe collection ' + collection_id)
     client=boto3.client('rekognition')
 
     try:
-        response=client.describe_collection(CollectionId=collectionId)
+        response=client.describe_collection(CollectionId=collection_id)
         print("Collection Arn: "  + response['CollectionARN'])
         print("Face Count: "  + str(response['FaceCount']))
         print("Face Model Version: "  + response['FaceModelVersion'])
@@ -516,23 +524,27 @@ def describecollection(collectionId='face-collection'):
 
     except ClientError as e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            print ('The collection ' + collectionId + ' was not found ')
+            print ('The collection ' + collection_id + ' was not found ')
         else:
             print ('Error other than Not Found occurred: ' + e.response['Error']['Message'])
     print('Done...')
 
 @task()
-def deletecollection(collectionId='face-collection'):
-    print('Attempting to delete collection ' + collectionId)
+def deletecollection(**kwargs):
+    global_params_path = kwargs.get("global_params_path", "config/global-params.json")
+    global_params_dict = read_json(global_params_path)
+    collection_id = global_params_dict["CollectionId"]
+
+    print('Attempting to delete collection ' + collection_id)
     client=boto3.client('rekognition')
     statusCode=''
     try:
-        response=client.delete_collection(CollectionId=collectionId)
+        response=client.delete_collection(CollectionId=collection_id)
         statusCode=response['StatusCode']
 
     except ClientError as e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            print ('The collection ' + collectionId + ' was not found ')
+            print ('The collection ' + collection_id + ' was not found ')
         else:
             print ('Error other than Not Found occurred: ' + e.response['Error']['Message'])
         statusCode=e.response['ResponseMetadata']['HTTPStatusCode']

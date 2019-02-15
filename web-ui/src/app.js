@@ -16,7 +16,7 @@ var axiosInstance = axios.create({
 
 var app = new Vue({
   el: '#app',
-  
+
   methods: {
   	fetchFrames: function(){
   		axiosInstance.get('enrichedframe')
@@ -33,7 +33,7 @@ var app = new Vue({
   	toggleFetchFrames: function(){
   		if(!this.autoload){
   			//this.autoloadTimer.stop();
-  			this.autoloadTimer = setInterval(this.fetchFrames, 3000);
+  			this.autoloadTimer = setInterval(this.fetchFrames, 150);
   			this.autoload=true;
   		}
   		else{
@@ -53,6 +53,3 @@ var app = new Vue({
   	autoloadTimer : null,
   },
 })
-
-
-

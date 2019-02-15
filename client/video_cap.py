@@ -12,18 +12,23 @@ import time
 import cPickle
 from multiprocessing import Pool
 import pytz
+import json
 
 kinesis_client = boto3.client("kinesis")
 rekog_client = boto3.client("rekognition")
 
 camera_index = 0 # 0 is usually the built-in webcam
-capture_rate = 30 # Frame capture rate.. every X frames. Positive integer.
+capture_rate = 150 # Frame capture rate.. every X frames. Positive integer.
 rekog_max_labels = 123
 rekog_min_conf = 50.0
 
 #Send frame to Kinesis stream
-def encode_and_send_frame(frame, frame_count, enable_kinesis=True, enable_rekog=False, write_file=False):
+def encode_and_send_frame(frame, frame_count, enable_kinesis=True, enable_rekog=False, write_file=False,):
     try:
+        global_params_path = kwargs.get("global_params_path", "config/global-params.json")
+        global_params_dict = json.loads(global_params_path)
+        collection_id = global_params_dict["CollectionId"]
+
         #convert opencv Mat to jpg image
         #print "----FRAME---"
         retval, buff = cv2.imencode(".jpg", frame)
@@ -56,20 +61,34 @@ def encode_and_send_frame(frame, frame_count, enable_kinesis=True, enable_rekog=
             print response
 
         if enable_rekog:
-            response = rekog_client.detect_labels(
+            response = rekog_client.index_faces(
+                CollectionId=collection_id,
                 Image={
                     'Bytes': img_bytes
                 },
-                MaxLabels=rekog_max_labels,
-                MinConfidence=rekog_min_conf
+                #ExternalImageId='string',
+                DetectionAttributes=[
+                    'DEFAULT'
+                ],
+                MaxFaces=123,
+                QualityFilter='AUTO'
             )
             print response
-
+#        if enable_rekog:
+#            response = rekog_client.detect_labels(
+#                Image={
+#                    'Bytes': img_bytes
+#                },
+#                MaxLabels=rekog_max_labels,
+#                MinConfidence=rekog_min_conf
+#            )
+#            print response
+#
     except Exception as e:
         print e
 
 
-def main():
+def main(**kwargs):
 
     argv_len = len(sys.argv)
 
@@ -105,4 +124,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

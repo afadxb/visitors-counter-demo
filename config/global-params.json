@@ -1,3 +1,4 @@
 {
-    "StackName" : "video-analyzer-stack"
+    "StackName" : "video-analyzer-stack",
+    "CollectionId" : "face-collection"
 }
