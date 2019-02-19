@@ -18,16 +18,13 @@ kinesis_client = boto3.client("kinesis")
 rekog_client = boto3.client("rekognition")
 
 camera_index = 0 # 0 is usually the built-in webcam
-capture_rate = 150 # Frame capture rate.. every X frames. Positive integer.
-rekog_max_labels = 123
+capture_rate = 500 # Frame capture rate.. every X frames. Positive integer.
 rekog_min_conf = 50.0
 
 #Send frame to Kinesis stream
 def encode_and_send_frame(frame, frame_count, enable_kinesis=True, enable_rekog=False, write_file=False,):
     try:
-        global_params_path = kwargs.get("global_params_path", "config/global-params.json")
-        global_params_dict = json.loads(global_params_path)
-        collection_id = global_params_dict["CollectionId"]
+        collection_id = "face-collection"
 
         #convert opencv Mat to jpg image
         #print "----FRAME---"
@@ -58,7 +55,7 @@ def encode_and_send_frame(frame, frame_count, enable_kinesis=True, enable_rekog=
                 Data=cPickle.dumps(frame_package),
                 PartitionKey="partitionkey"
             )
-            print response
+            #print response
 
         if enable_rekog:
             response = rekog_client.index_faces(
@@ -73,22 +70,13 @@ def encode_and_send_frame(frame, frame_count, enable_kinesis=True, enable_rekog=
                 MaxFaces=123,
                 QualityFilter='AUTO'
             )
-            print response
-#        if enable_rekog:
-#            response = rekog_client.detect_labels(
-#                Image={
-#                    'Bytes': img_bytes
-#                },
-#                MaxLabels=rekog_max_labels,
-#                MinConfidence=rekog_min_conf
-#            )
-#            print response
-#
+            #print response
+
     except Exception as e:
         print e
 
 
-def main(**kwargs):
+def main():
 
     argv_len = len(sys.argv)
 

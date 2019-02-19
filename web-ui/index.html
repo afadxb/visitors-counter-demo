@@ -26,7 +26,7 @@ or in the "license" file accompanying this file. This file is distributed on an 
 
 <body>
     <div id="app">
-    
+
     <div class="header">
         <h1><img class="logo" src="logo.png" alt="Logo">Amazon Rekognition Video Analyzer</h1>
     </div>
@@ -35,8 +35,8 @@ or in the "license" file accompanying this file. This file is distributed on an 
       <div class="inner-grid-list">
         <span v-if="enrichedframes && enrichedframes.length">
           <div v-for="frame of enrichedframes" class="inner-grid">
-              <div class="container-img"> 
-                <img class="frame-image" v-bind:src="frame.s3_presigned_url" alt="Video Frame Here" /> 
+              <div class="container-img">
+                <img class="frame-image" v-bind:src="frame.s3_presigned_url" alt="Video Frame Here" />
               </div>
               <div class="container">
                 <div>
@@ -45,10 +45,10 @@ or in the "license" file accompanying this file. This file is distributed on an 
                   <span>
                       <ul class="rekog-label-list">
                           <b>Detected objects</b>
-                          <li class="rekog-label" v-for="label of frame.rekog_labels">
-                              {{label.Name}} ({{(Math.round((label.Confidence + 0.00001) * 100) / 100) + "%"}}) <b>{{label.OnWatchList? "On Watch List -- ALERT!" : ""}}</b>
+                          <li class="rekog-label" v-for="face_record of frame.rekog_face_records">
+                              {{face_record.Face.FaceId}} ({{(Math.round((face_record.Face.Confidence + 0.00001) * 100) / 100) + "%"}})
                           </li>
-                      </ul> 
+                      </ul>
                   </span>
                 </div>
               </div>
@@ -58,9 +58,9 @@ or in the "license" file accompanying this file. This file is distributed on an 
       <div>
         <h2>Settings</h2>
         <div class="load">
-            
+
             <div>Autoload</div>
-            <div> 
+            <div>
               <label class="switch">
                 <input type="checkbox" v-on:click="toggleFetchFrames" :checked="autoload">
                 <div class="slider round"></div>

@@ -16,6 +16,19 @@ import pytz
 from pytz import timezone
 from copy import deepcopy
 
+def replace_floats(obj):
+    if isinstance(obj, list):
+        for i in xrange(len(obj)):
+            obj[i] = replace_floats(obj[i])
+        return obj
+    elif isinstance(obj, dict):
+        for k in obj.iterkeys():
+            obj[k] = replace_floats(obj[k])
+        return obj
+    elif isinstance(obj, float):
+        return int(obj)
+    else:
+        return obj
 
 def load_config():
     '''Load configuration from file.'''
@@ -54,13 +67,7 @@ def process_image(event, context):
 
     ddb_table = dynamodb.Table(config["ddb_table"])
 
-    rekog_max_labels = config["rekog_max_labels"]
     rekog_min_conf = float(config["rekog_min_conf"])
-
-    label_watch_list = config["label_watch_list"]
-    label_watch_min_conf = float(config["label_watch_min_conf"])
-    label_watch_phone_num = config.get("label_watch_phone_num", "")
-    label_watch_sns_topic_arn = config.get("label_watch_sns_topic_arn", "")
 
     #Iterate on frames fetched from Kinesis
     for record in event['Records']:
@@ -84,81 +91,27 @@ def process_image(event, context):
         day = now.strftime("%d")
         hour = now.strftime("%H")
 
-        response = rekog_client.index_faces(
+        rekog_response = rekog_client.index_faces(
             CollectionId=collection_id,
             Image={
                 'Bytes': img_bytes
-                }
             },
             #ExternalImageId='string',
             DetectionAttributes=[
-                'DEFAULT',
+                'DEFAULT'
             ],
-            MaxFaces=123,
-            QualityFilter='AUTO'
+            #These two below require higher boto3 version, but python SDK does not support it yet
+            #MaxFaces=123,
+            #QualityFilter='AUTO'
         )
-        print response
 
-#        rekog_response = rekog_client.detect_labels(
-#            Image={
-#                'Bytes': img_bytes
-#            },
-#            MaxLabels=rekog_max_labels,
-#            MinConfidence=rekog_min_conf
-#        )
+        #Iterate on rekognition face records. Enrich and prep them for storage in DynamoDB
+        for face_record in rekog_response['FaceRecords']:
 
-
-        #Iterate on rekognition labels. Enrich and prep them for storage in DynamoDB
-        labels_on_watch_list = []
-        for label in rekog_response['Labels']:
-
-            lbl = label['Name']
-            conf = label['Confidence']
-            label['OnWatchList'] = False
-
-            #Print labels and confidence to lambda console
-            print('{} .. conf %{:.2f}'.format(lbl, conf))
-
-            #Check label watch list and trigger action
-            if (lbl.upper() in (label.upper() for label in label_watch_list)
-                and conf >= label_watch_min_conf):
-
-                label['OnWatchList'] = True
-                labels_on_watch_list.append(deepcopy(label))
+            conf = face_record['Face']['Confidence']
 
             #Convert from float to decimal for DynamoDB
-            label['Confidence'] = decimal.Decimal(conf)
-
-        #Send out notification(s), if needed
-        if len(labels_on_watch_list) > 0 \
-                and (label_watch_phone_num or label_watch_sns_topic_arn):
-
-            notification_txt = 'On {}...\n'.format(now.strftime('%x, %-I:%M %p %Z'))
-
-            for label in labels_on_watch_list:
-
-                notification_txt += '- "{}" was detected with {}% confidence.\n'.format(
-                    label['Name'],
-                    round(label['Confidence'], 2))
-
-            print(notification_txt)
-
-            if label_watch_phone_num:
-                sns_client.publish(PhoneNumber=label_watch_phone_num, Message=notification_txt)
-
-            if label_watch_sns_topic_arn:
-                resp = sns_client.publish(
-                    TopicArn=label_watch_sns_topic_arn,
-                    Message=json.dumps(
-                        {
-                            "message": notification_txt,
-                            "labels": labels_on_watch_list
-                        }
-                    )
-                )
-
-                if resp.get("MessageId", ""):
-                    print("Successfully published alert message to SNS.")
+            face_record['Face']['Confidence'] = decimal.Decimal(conf)
 
         #Store frame image in S3
         s3_key = (s3_key_frames_root + '{}/{}/{}/{}/{}.jpg').format(year, mon, day, hour, frame_id)
@@ -175,7 +128,7 @@ def process_image(event, context):
             'frame_id': frame_id,
             'processed_timestamp' : processed_timestamp,
             'approx_capture_timestamp' : approx_capture_timestamp,
-            'rekog_labels' : rekog_response['Labels'],
+            'rekog_face_records' : rekog_response['FaceRecords'],
             'rekog_orientation_correction' :
                 rekog_response['OrientationCorrection']
                 if 'OrientationCorrection' in rekog_response else 'ROTATE_0',
@@ -183,6 +136,8 @@ def process_image(event, context):
             's3_bucket' : s3_bucket,
             's3_key' : s3_key
         }
+
+        replace_floats(item)
 
         ddb_table.put_item(Item=item)
 

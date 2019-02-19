@@ -550,3 +550,17 @@ def deletecollection(**kwargs):
         statusCode=e.response['ResponseMetadata']['HTTPStatusCode']
     print('Operation returned Status Code: ' + str(statusCode))
     print('Done...')
+
+@task()
+def doall():
+    deletedata()
+    deletestack()
+    clean()
+    deletecollection()
+    createcollection()
+    packagelambda()
+    deploylambda()
+    createstack()
+    webui()
+    videocapture()
+    print "type pynt webuiserver in another window"

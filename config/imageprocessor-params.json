@@ -4,13 +4,7 @@
 
 	"ddb_table" : "EnrichedFrame",
 
-	"rekog_max_labels" : 123,
-    "rekog_min_conf" : 50.0,
-
-	"label_watch_list" : ["Human", "Smile"],
-	"label_watch_min_conf" : 90.0,
-	"label_watch_phone_num" : "",
-  "label_watch_sns_topic_arn" : "",
+  "rekog_min_conf" : 50.0,
 
 	"timezone" : "US/Eastern"
 }

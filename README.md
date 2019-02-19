@@ -395,7 +395,10 @@ $ pynt deploylambda #Second, deploy your lambda code to Amazon S3
 #Command output without errors
 
 $ pynt createstack #Now, create the prototype's CloudFormation stack
+```
+after creating stack, go to roles in aws console iam service, and add total access to rekognition for the imageprocessor lambda function (you need to create such policy by yourself, the existing ones are not enough).
 
+```bash
 #Command output without errors
 
 $ pynt webui #Build the Web UI
