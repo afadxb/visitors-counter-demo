@@ -33,7 +33,7 @@ var app = new Vue({
   	toggleFetchFrames: function(){
   		if(!this.autoload){
   			//this.autoloadTimer.stop();
-  			this.autoloadTimer = setInterval(this.fetchFrames, 5000);
+  			this.autoloadTimer = setInterval(this.fetchFrames, 1000);
   			this.autoload=true;
   		}
   		else{

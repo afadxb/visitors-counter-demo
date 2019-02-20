@@ -19,7 +19,79 @@ rekog_client = boto3.client("rekognition")
 
 camera_index = 0 # 0 is usually the built-in webcam
 capture_rate = 500 # Frame capture rate.. every X frames. Positive integer.
-rekog_min_conf = 50.0
+is_local = False
+
+def run_local_implementation(frame, frame_count):
+    try:
+        collection_id = "face-collection"
+
+        retval, buff = cv2.imencode(".jpg", frame)
+
+        img_bytes = bytearray(buff)
+
+        utc_dt = pytz.utc.localize(datetime.datetime.now())
+        now_ts_utc = (utc_dt - datetime.datetime(1970, 1, 1, tzinfo=pytz.utc)).total_seconds()
+
+        frame_package = {
+            'ApproximateCaptureTime' : now_ts_utc,
+            'FrameCount' : frame_count,
+            'ImageBytes' : img_bytes
+        }
+
+        index_faces_response = rekog_client.index_faces(
+            CollectionId=collection_id,
+            Image={
+                'Bytes': img_bytes
+            },
+            #ExternalImageId='string',
+            DetectionAttributes=[
+                'DEFAULT'
+            ],
+            MaxFaces=5,
+            QualityFilter='AUTO'
+        )
+        #print response
+
+        faces_to_delete = []
+        #Iterate on rekognition face records. Enrich and prep them for storage in DynamoDB
+        for face_record in index_faces_response['FaceRecords']:
+
+            search_response = rekog_client.search_faces(
+                CollectionId=collection_id,
+                FaceId=face_record['Face']['FaceId'],
+                #did not check, but I think it is not supported in python's sdk, judging by prior experience with index_faces
+                MaxFaces=2,
+                FaceMatchThreshold=70
+            )
+
+            face_record['isNew'] = True
+
+            if len(search_response['FaceMatches']) > 0:
+                face_record['isNew'] = False
+
+            if len(search_response['FaceMatches']) > 1:
+                print 'search of similar faces responded more than one face instances'
+
+            for found_face in search_response['FaceMatches']:
+                if found_face['Face']['Confidence'] > face_record['Face']['Confidence']:
+                    #delete new face, and change it to old Convert
+                    faces_to_delete.append(face_record['Face']['FaceId'])
+                    face_record['Face']['FaceId'] = found_face['Face']['FaceId']
+                else:
+                    #delete old face
+                    faces_to_delete.append(found_face['Face']['FaceId'])
+
+            if face_record['isNew']:
+                print 'New Face is Found'
+
+        #delete unnecessary faces_to_delete
+        if len(faces_to_delete) > 0:
+            delete_response=rekog_client.delete_faces(CollectionId=collection_id,
+                           FaceIds=faces_to_delete)
+        print 'face duplicates were deleted'
+    except Exception as e:
+        print e
+
 
 #Send frame to Kinesis stream
 def encode_and_send_frame(frame, frame_count, enable_kinesis=True, enable_rekog=False, write_file=False,):
@@ -76,6 +148,7 @@ def encode_and_send_frame(frame, frame_count, enable_kinesis=True, enable_rekog=
         print e
 
 
+
 def main():
 
     argv_len = len(sys.argv)
@@ -96,7 +169,10 @@ def main():
             break
 
         if frame_count % capture_rate == 0:
-            result = pool.apply_async(encode_and_send_frame, (frame, frame_count, True, False, False,))
+            if is_local:
+                result = pool.apply_async(run_local_implementation, (frame, frame_count))
+            else:
+                result = pool.apply_async(encode_and_send_frame, (frame, frame_count))
 
         frame_count += 1
 

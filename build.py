@@ -564,3 +564,4 @@ def doall():
     webui()
     videocapture()
     print "type pynt webuiserver in another window"
+    print "and do not forget to add policy of full access to rekognition to the lambda function role"

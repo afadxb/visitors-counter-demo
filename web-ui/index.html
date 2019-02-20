@@ -46,7 +46,7 @@ or in the "license" file accompanying this file. This file is distributed on an 
                       <ul class="rekog-label-list">
                           <b>Detected objects</b>
                           <li class="rekog-label" v-for="face_record of frame.rekog_face_records">
-                              {{face_record.Face.FaceId}} ({{(Math.round((face_record.Face.Confidence + 0.00001) * 100) / 100) + "%"}})
+                              {{face_record.Face.FaceId}} <b>{{face_record.isNew}}</b>
                           </li>
                       </ul>
                   </span>

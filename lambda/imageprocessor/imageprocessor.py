@@ -101,17 +101,43 @@ def process_image(event, context):
                 'DEFAULT'
             ],
             #These two below require higher boto3 version, but python SDK does not support it yet
+            #maximum number of the first biggest faces to return
             #MaxFaces=123,
+            #QualityFilter is turned on by default
             #QualityFilter='AUTO'
         )
 
+        faces_to_delete = []
         #Iterate on rekognition face records. Enrich and prep them for storage in DynamoDB
         for face_record in rekog_response['FaceRecords']:
 
+            search_response = rekog_client.search_faces(
+                CollectionId=collection_id,
+                FaceId=face_record['Face']['FaceId'],
+                #did not check, but I think it is not supported in python's sdk, judging by prior experience with index_faces
+                MaxFaces=1,
+                FaceMatchThreshold=90
+            )
+
+            face_record['isNew'] = True
+
+            for found_face in search_response['FaceMatches']:
+
+                if found_face['Face']['Confidence'] > face_record['Face']['Confidence']:
+                    #delete new face, and change it to old Convert
+                    faces_to_delete.append(face_record['Face']['FaceId'])
+                    face_record['Face']['FaceId'] = found_face['Face']['FaceId']
+
+                else:
+                    #delete old face
+                    faces_to_delete.append(found_face['Face']['FaceId'])
+                face_record['isNew'] = False
+
             conf = face_record['Face']['Confidence']
 
-            #Convert from float to decimal for DynamoDB
-            face_record['Face']['Confidence'] = decimal.Decimal(conf)
+            #delete unnecessary faces_to_delete
+            delete_response=rekog_client.delete_faces(CollectionId=collection_id,
+                               FaceIds=faces_to_delete)
 
         #Store frame image in S3
         s3_key = (s3_key_frames_root + '{}/{}/{}/{}/{}.jpg').format(year, mon, day, hour, frame_id)
