@@ -1,8 +1,3 @@
-# Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
-#     http://aws.amazon.com/asl/
-# or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions and limitations under the License.
-
 import sys
 import cPickle
 import datetime
@@ -14,16 +9,15 @@ from multiprocessing import Pool
 import pytz
 import json
 
-kinesis_client = boto3.client("kinesis")
 rekog_client = boto3.client("rekognition")
 
 camera_index = 0 # 0 is usually the built-in webcam
 capture_rate = 500 # Frame capture rate.. every X frames. Positive integer.
-is_local = False
 
-def run_local_implementation(frame, frame_count):
+def send_frame(frame, frame_count):
     try:
-        collection_id = "face-collection"
+        #collection_id = "face-collection"
+        collection_id = get_global_params()["CollectionId"]
 
         retval, buff = cv2.imencode(".jpg", frame)
 
@@ -92,63 +86,6 @@ def run_local_implementation(frame, frame_count):
     except Exception as e:
         print e
 
-
-#Send frame to Kinesis stream
-def encode_and_send_frame(frame, frame_count, enable_kinesis=True, enable_rekog=False, write_file=False,):
-    try:
-        collection_id = "face-collection"
-
-        #convert opencv Mat to jpg image
-        #print "----FRAME---"
-        retval, buff = cv2.imencode(".jpg", frame)
-
-        img_bytes = bytearray(buff)
-
-        utc_dt = pytz.utc.localize(datetime.datetime.now())
-        now_ts_utc = (utc_dt - datetime.datetime(1970, 1, 1, tzinfo=pytz.utc)).total_seconds()
-
-        frame_package = {
-            'ApproximateCaptureTime' : now_ts_utc,
-            'FrameCount' : frame_count,
-            'ImageBytes' : img_bytes
-        }
-
-        if write_file:
-            print("Writing file img_{}.jpg".format(frame_count))
-            target = open("img_{}.jpg".format(frame_count), 'w')
-            target.write(img_bytes)
-            target.close()
-
-        #put encoded image in kinesis stream
-        if enable_kinesis:
-            print "Sending image to Kinesis"
-            response = kinesis_client.put_record(
-                StreamName="FrameStream",
-                Data=cPickle.dumps(frame_package),
-                PartitionKey="partitionkey"
-            )
-            #print response
-
-        if enable_rekog:
-            response = rekog_client.index_faces(
-                CollectionId=collection_id,
-                Image={
-                    'Bytes': img_bytes
-                },
-                #ExternalImageId='string',
-                DetectionAttributes=[
-                    'DEFAULT'
-                ],
-                MaxFaces=123,
-                QualityFilter='AUTO'
-            )
-            #print response
-
-    except Exception as e:
-        print e
-
-
-
 def main():
 
     argv_len = len(sys.argv)
@@ -169,10 +106,7 @@ def main():
             break
 
         if frame_count % capture_rate == 0:
-            if is_local:
-                result = pool.apply_async(run_local_implementation, (frame, frame_count))
-            else:
-                result = pool.apply_async(encode_and_send_frame, (frame, frame_count))
+            result = pool.apply_async(run_local_implementation, (frame, frame_count))
 
         frame_count += 1
 
